@@ -412,8 +412,18 @@ def build_app():
     default_resolution = "360p (480x360) - Fastest Testing Baseline" if is_lightning_studio() else "480p (640x368) - Optimized Safe Balanced Size"
     default_duration = 2 if is_lightning_studio() else 5
     default_steps = 6 if is_lightning_studio() else 8
+# footer
+    css = """
+footer {
+    display: none !important;
+}
+"""
 
-    with gr.Blocks(theme=gr.themes.Soft()) as app:
+with gr.Blocks(
+    theme=gr.themes.Soft(),
+    css=css
+) as app:
+   # footer 
         gr.Markdown("# LTX-Video 2.3 Studio Cloud Interface")
         gr.Markdown("Generate videos with the controls below. Use the engine logs tab for live progress and error details.")
 
