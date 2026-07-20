@@ -11,7 +11,7 @@ import gradio as gr
 
 # footer
 demo.launch(show_api=False)
-#footer
+# footer
 
 from requests.exceptions import ReadTimeout
 
