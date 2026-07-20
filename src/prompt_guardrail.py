@@ -3,6 +3,9 @@
 import re
 import unicodedata
 
+# Configuration: Set to False to disable content guardrail entirely
+ENABLE_GUARDRAIL = True
+
 # Whole-word terms (English + Indonesian). Kept in a set for fast lookup.
 _BLOCKED_TERMS = {
     # Explicit / pornography
@@ -94,9 +97,12 @@ def check_prompt_safety(prompt: str) -> tuple[bool, str | None]:
     Check whether a prompt is safe to send to the generator.
 
     Returns:
-        (True, None) if safe.
+        (True, None) if safe or guardrail is disabled.
         (False, reason) if blocked.
     """
+    if not ENABLE_GUARDRAIL:
+        return True, None
+    
     normalized = _normalize(prompt)
     if not normalized:
         return True, None
@@ -118,6 +124,9 @@ def enforce_prompt_safety(prompt: str, *, field_name: str = "Prompt") -> None:
 
     Use this from generation handlers before calling the backend.
     """
+    if not ENABLE_GUARDRAIL:
+        return
+    
     is_safe, reason = check_prompt_safety(prompt)
     if not is_safe:
         detail = reason or "Unsafe content detected."

@@ -24,7 +24,7 @@ else:
     LOG_PATH = "/kaggle/working/server.log"
 
 # Configuration: Set to False to disable content guardrail entirely (only in code, no UI)
-ENABLE_GUARDRAIL = False
+ENABLE_GUARDRAIL = True
 
 def get_working_dir():
     """Returns the environment-specific directory for generated outputs."""
@@ -273,6 +273,8 @@ except ImportError:
             return None
 
         def enforce_prompt_safety(prompt: str, *, field_name: str = "Prompt") -> None:
+            if not ENABLE_GUARDRAIL:
+                return
             normalized = _normalize_prompt(prompt)
             if not normalized:
                 return
