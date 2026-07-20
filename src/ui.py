@@ -407,20 +407,65 @@ def handle_generation(prompt, negative_prompt, steps, resolution_preset, use_cus
         except Exception as e:
             raise gr.Error(f"Could not communicate with the generation server.\n\n{type(e).__name__}: {e}\n\nRecent logs:\n{get_live_logs()}")
 
+_UI_DIR = Path(__file__).resolve().parent
+
+def _load_ui_css():
+    css_path = _UI_DIR / "ui_theme.css"
+    if css_path.exists():
+        return css_path.read_text(encoding="utf-8")
+    return "footer { display: none !important; }"
+
+def _modern_theme():
+    return gr.themes.Base(
+        primary_hue=gr.themes.colors.purple,
+        secondary_hue=gr.themes.colors.pink,
+        neutral_hue=gr.themes.colors.slate,
+        font=gr.themes.GoogleFont("Inter"),
+        font_mono=gr.themes.GoogleFont("JetBrains Mono"),
+    ).set(
+        body_background_fill="#0c0c12",
+        body_background_fill_dark="#0c0c12",
+        block_background_fill="#16161f",
+        block_background_fill_dark="#16161f",
+        block_border_color="rgba(255,255,255,0.08)",
+        block_border_width="1px",
+        block_label_text_weight="600",
+        block_title_text_weight="700",
+        block_radius="14px",
+        button_large_radius="12px",
+        button_primary_background_fill="linear-gradient(90deg, #6C4DFF 0%, #9B5DE5 50%, #FF4FBF 100%)",
+        button_primary_background_fill_hover="linear-gradient(90deg, #7D5FFF 0%, #AB6DFF 50%, #FF6FCF 100%)",
+        button_primary_text_color="white",
+        button_secondary_background_fill="#252532",
+        button_secondary_background_fill_hover="#2f2f40",
+        input_background_fill="#12121a",
+        input_border_color="rgba(255,255,255,0.1)",
+        shadow_drop="0 8px 32px rgba(0,0,0,0.35)",
+    )
+
 def build_app():
     """Constructs and returns the Gradio app blocks."""
     default_resolution = "360p (480x360) - Fastest Testing Baseline" if is_lightning_studio() else "480p (640x368) - Optimized Safe Balanced Size"
     default_duration = 2 if is_lightning_studio() else 5
     default_steps = 6 if is_lightning_studio() else 8
 
-    with gr.Blocks(theme=gr.themes.Soft()) as app:
-        gr.Markdown("# LTX-Video 2.3 Studio Cloud Interface")
-        gr.Markdown("Generate videos with the controls below. Use the engine logs tab for live progress and error details.")
+    with gr.Blocks(theme=_modern_theme(), css=_load_ui_css(), elem_id="ltx-app", title="LTX Video Studio") as app:
+        gr.HTML(
+            """
+            <div class="luna-hero">
+                <span class="luna-badge">LTX 2.3</span>
+                <h1>LTX Video Studio</h1>
+                <p>Generate videos with fine-tuned controls. Monitor engine logs and browse your generation history.</p>
+            </div>
+            """
+        )
 
-        with gr.Row():
+        with gr.Row(equal_height=False):
             with gr.Column(scale=1):
-                prompt = gr.Textbox(label="Text Prompt", placeholder="Describe the video actions and sounds clearly...")
-                neg_prompt = gr.Textbox(label="Negative Prompt", value="blurry, worst quality, low quality, glitch, distortion")
+                with gr.Group(elem_classes="luna-panel"):
+                    gr.Markdown("**Controls**", elem_classes="luna-panel-title")
+                    prompt = gr.Textbox(label="Text Prompt", placeholder="Describe the video actions and sounds clearly...", lines=3)
+                    neg_prompt = gr.Textbox(label="Negative Prompt", value="blurry, worst quality, low quality, glitch, distortion", lines=2)
 
                 resolution_preset = gr.Dropdown(
                     choices=[
@@ -449,18 +494,21 @@ def build_app():
 
                 enable_upscale = gr.Checkbox(label="Enable Native Hi-Res Upscaling Pass", value=False)
                 input_image = gr.Image(label="Input Image (For Image-to-Video)", type="filepath")
-                generate_btn = gr.Button("Generate New Video", variant="primary")
+                generate_btn = gr.Button("Generate New Video", variant="primary", elem_id="ltx-generate-btn", size="lg")
 
             with gr.Column(scale=1):
-                output_video = gr.Video(label="Generated Result Screen")
-                with gr.Tab("Active Engine Logs"):
-                    log_box = gr.Textbox(label="Live C++ Terminal Output Stream", value="", lines=10, interactive=False)
-                    log_timer = gr.Timer(value=3.0, active=True)
-                    log_timer.tick(fn=get_live_logs, outputs=log_box)
+                with gr.Group(elem_classes="luna-panel"):
+                    gr.Markdown("**Preview**", elem_classes="luna-panel-title")
+                    output_video = gr.Video(label="Generated Result", elem_id="ltx-result")
+                with gr.Tabs():
+                    with gr.Tab("Engine Logs"):
+                        log_box = gr.Textbox(label="Live Terminal Output", value="", lines=10, interactive=False, show_label=False)
+                        log_timer = gr.Timer(value=3.0, active=True)
+                        log_timer.tick(fn=get_live_logs, outputs=log_box)
 
-                with gr.Tab("Generation History"):
-                    refresh_history_btn = gr.Button("Refresh History Archive", variant="secondary")
-                    history_gallery = gr.File(label="Generated Video Vault Files", file_count="multiple")
+                    with gr.Tab("History"):
+                        refresh_history_btn = gr.Button("Refresh History", variant="secondary", elem_classes="luna-secondary-btn")
+                        history_gallery = gr.File(label="Saved Videos", file_count="multiple")
 
         generate_btn.click(
             fn=handle_generation,
@@ -481,7 +529,7 @@ def build_app():
 def launch():
     """Convenience function to start UI immediately in Kaggle."""
     app = build_app()
-    app.launch(share=True, inline=False, allowed_paths=[get_working_dir()])
+    app.launch(share=True, inline=False, allowed_paths=[get_working_dir()], show_api=False)
 
 # =====================================================================
 # Z-Image-Turbo Image Generation UI Components
@@ -605,51 +653,71 @@ def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selec
 
 def build_image_app():
     """Constructs and returns the Gradio app blocks for Z-Image-Turbo."""
-    from pathlib import Path
-    with gr.Blocks(theme=gr.themes.Soft()) as app:
-        gr.Markdown("# Luna AI Imagine")
-        gr.Markdown("Generate high-speed image with Luna AI Imagine.")
+    with gr.Blocks(theme=_modern_theme(), css=_load_ui_css(), elem_id="luna-app", title="Luna AI Imagine") as app:
+        gr.HTML(
+            """
+            <div class="luna-hero">
+                <span class="luna-badge">Z-Image Turbo</span>
+                <h1>Luna AI Imagine</h1>
+                <p>High-speed image generation with resolution presets, LoRA support, and live engine monitoring.</p>
+            </div>
+            """
+        )
 
-        with gr.Row():
+        with gr.Row(equal_height=False):
             with gr.Column(scale=1):
-                prompt = gr.Textbox(label="Prompt", value="Create a premium, modern, minimalist vector logo for a tool engine called: Luna AI Imagine, featuring a cute chibi anime mascot inspired by a young businesswoman with short magenta/pink bob hair, large bright blue eyes, fair skin, wearing a black business blazer, white shirt, black skirt, and black shoes, smiling cheerfully with one eye winking while pointing upward with one hand and resting the other on her waist. Place the mascot inside a modern circular emblem with a purple-to-pink gradient ring inspired by a crescent moon, with a simplified visual novel UI window behind her showing a dialogue box, landscape background, and minimal interface controls in a clean flat vector style. Add subtle sparkles, stars, and a crescent moon icon to reinforce the Luna identity. Use bold rounded geometric sans-serif typography with the text: Luna and a large stylized text: AI, with the subtitle: - IMAGINE - below. Use a premium color palette of purple (#6C4DFF), pink (#FF4FBF), dark navy (#2B2145), and white accents with soft neon gradients. The logo should feel like a premium startup brand, inspired by Japanese anime, with a clean flat vector illustration style, modern UI aesthetic, cute yet professional appearance, symmetrical composition, high contrast, suitable for software branding, website, launcher, GitHub, and application icon, ultra-clean SVG-style vector quality, transparent background, 1:1 aspect ratio, no watermark, no mockup, no realistic rendering, no photorealism, no 3D, no blur, no pixelation, no extra characters, no distorted anatomy, no clutter, no complex background, and no unnecessary decorative elements. 8k", lines=3)
-                
-                with gr.Row():
-                    preset = gr.Dropdown([n for n, _, _ in RES_PRESETS], value="1:1 (512x512)", label="Resolution Preset")
-                    steps = gr.Slider(1, 50, value=8, step=1, label="Steps")
-                
-                with gr.Row():
-                    width = gr.Dropdown(SIZE_OPTIONS, value=512, label="Width")
-                    height = gr.Dropdown(SIZE_OPTIONS, value=512, label="Height")
-                
-                with gr.Row():
-                    cfg_scale = gr.Slider(0.0, 10.0, value=1.0, step=0.1, label="CFG Scale")
-                    seed = gr.Number(value=0, label="Seed (0 = random)")
-                
-                with gr.Group():
-                    gr.Markdown("### LoRA Support (Place inside `/tmp/models/loras/`)")
+                with gr.Group(elem_classes="luna-panel"):
+                    gr.Markdown("**Prompt**", elem_classes="luna-panel-title")
+                    prompt = gr.Textbox(
+                        label="Describe your image",
+                        show_label=False,
+                        value="Create a premium, modern, minimalist vector logo for a tool engine called: Luna AI Imagine, featuring a cute chibi anime mascot inspired by a young businesswoman with short magenta/pink bob hair, large bright blue eyes, fair skin, wearing a black business blazer, white shirt, black skirt, and black shoes, smiling cheerfully with one eye winking while pointing upward with one hand and resting the other on her waist. Place the mascot inside a modern circular emblem with a purple-to-pink gradient ring inspired by a crescent moon, with a simplified visual novel UI window behind her showing a dialogue box, landscape background, and minimal interface controls in a clean flat vector style. Add subtle sparkles, stars, and a crescent moon icon to reinforce the Luna identity. Use bold rounded geometric sans-serif typography with the text: Luna and a large stylized text: AI, with the subtitle: - IMAGINE - below. Use a premium color palette of purple (#6C4DFF), pink (#FF4FBF), dark navy (#2B2145), and white accents with soft neon gradients. The logo should feel like a premium startup brand, inspired by Japanese anime, with a clean flat vector illustration style, modern UI aesthetic, cute yet professional appearance, symmetrical composition, high contrast, suitable for software branding, website, launcher, GitHub, and application icon, ultra-clean SVG-style vector quality, transparent background, 1:1 aspect ratio, no watermark, no mockup, no realistic rendering, no photorealism, no 3D, no blur, no pixelation, no extra characters, no distorted anatomy, no clutter, no complex background, and no unnecessary decorative elements. 8k",
+                        lines=4,
+                        placeholder="Describe the image you want to create...",
+                    )
+
+                with gr.Group(elem_classes="luna-panel"):
+                    gr.Markdown("**Settings**", elem_classes="luna-panel-title")
+                    with gr.Row():
+                        preset = gr.Dropdown([n for n, _, _ in RES_PRESETS], value="1:1 (512x512)", label="Resolution Preset")
+                        steps = gr.Slider(1, 50, value=8, step=1, label="Steps")
+
+                    with gr.Row():
+                        width = gr.Dropdown(SIZE_OPTIONS, value=512, label="Width")
+                        height = gr.Dropdown(SIZE_OPTIONS, value=512, label="Height")
+
+                    with gr.Row():
+                        cfg_scale = gr.Slider(0.0, 10.0, value=1.0, step=0.1, label="CFG Scale")
+                        seed = gr.Number(value=0, label="Seed (0 = random)")
+
+                with gr.Group(elem_classes=["luna-panel", "luna-lora-box"]):
+                    gr.Markdown("### LoRA Support")
+                    gr.Markdown("*Place `.safetensors` files in `/tmp/models/loras/`*")
                     with gr.Row():
                         lora_list = gr.CheckboxGroup(choices=get_lora_list(), label="Select LoRAs")
-                        refresh_btn = gr.Button("Refresh LoRAs", variant="secondary", size="sm")
-                    with gr.Row():
-                        lora_strength = gr.Slider(0.0, 2.0, value=1.0, step=0.1, label="LoRA Strength")
-                    
+                        refresh_btn = gr.Button("Refresh", variant="secondary", size="sm", elem_classes="luna-secondary-btn")
+                    lora_strength = gr.Slider(0.0, 2.0, value=1.0, step=0.1, label="LoRA Strength")
+
                     def refresh_loras():
                         return gr.update(choices=get_lora_list())
                     refresh_btn.click(refresh_loras, outputs=[lora_list])
 
-                generate_btn = gr.Button("Generate Image", variant="primary")
+                generate_btn = gr.Button("Generate Image", variant="primary", elem_id="luna-generate-btn", size="lg")
 
             with gr.Column(scale=1):
-                img = gr.Image(label="Result", interactive=False, type="filepath")
-                with gr.Tab("Active Engine Logs"):
-                    log_box = gr.Textbox(label="Live C++ Terminal Output Stream", value="", lines=10, interactive=False)
-                    log_timer = gr.Timer(value=3.0, active=True)
-                    log_timer.tick(fn=get_live_logs, outputs=log_box)
+                with gr.Group(elem_classes="luna-panel"):
+                    gr.Markdown("**Result**", elem_classes="luna-panel-title")
+                    img = gr.Image(label="Output", show_label=False, interactive=False, type="filepath", elem_id="luna-result")
 
-                with gr.Tab("Generation History"):
-                    refresh_history_btn = gr.Button("Refresh History Archive", variant="secondary")
-                    history_gallery = gr.File(label="Generated Image Vault Files", file_count="multiple")
+                with gr.Tabs():
+                    with gr.Tab("Engine Logs"):
+                        log_box = gr.Textbox(label="Live Terminal Output", value="", lines=10, interactive=False, show_label=False)
+                        log_timer = gr.Timer(value=3.0, active=True)
+                        log_timer.tick(fn=get_live_logs, outputs=log_box)
+
+                    with gr.Tab("History"):
+                        refresh_history_btn = gr.Button("Refresh History", variant="secondary", elem_classes="luna-secondary-btn")
+                        history_gallery = gr.File(label="Saved Images", file_count="multiple")
 
         preset.change(apply_preset, inputs=[preset], outputs=[width, height])
 
@@ -668,6 +736,6 @@ def build_image_app():
 def launch_image():
     """Convenience function to start Z-Image-Turbo UI immediately in Kaggle."""
     app = build_image_app()
-    app.launch(share=True, inline=False, allowed_paths=[get_working_dir()])
+    app.launch(share=True, inline=False, allowed_paths=[get_working_dir()], show_api=False)
 
 
