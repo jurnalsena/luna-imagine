@@ -616,7 +616,7 @@ def build_image_app():
     """Constructs and returns the Gradio app blocks for Z-Image-Turbo."""
     from pathlib import Path
     with gr.Blocks(theme=gr.themes.Soft()) as app:
-        gr.Markdown("# Luna AI Imagine (z-image-turbo)")
+        gr.Markdown("# Luna AI Imagine")
         gr.Markdown("Generate high-speed image with Luna AI Imagine.")
 
         with gr.Row():
