@@ -10,6 +10,17 @@ import warnings
 import gradio as gr
 from requests.exceptions import ReadTimeout
 
+def greet(name):
+    return "Luna AI Imagine " + name + "!"
+
+demo = gr.Interface(
+    fn=greet,
+    inputs="text",
+    outputs="text",
+    css="footer {visibility: hidden}"
+)
+demo.launch()
+
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning, message=".*browser-compatible container.*")
 
