@@ -10,7 +10,9 @@ import warnings
 import gradio as gr
 
 # footer
-demo.launch(show_api=False)
+demo.launch(
+    footer_links=[]
+)
 # footer
 
 from requests.exceptions import ReadTimeout
