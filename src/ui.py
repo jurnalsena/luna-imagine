@@ -10,6 +10,8 @@ import warnings
 import gradio as gr
 from requests.exceptions import ReadTimeout
 
+gr.Blocks(css=css)
+
 def greet(name):
     return "Luna AI Imagine " + name + "!"
 
