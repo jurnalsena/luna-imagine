@@ -24,7 +24,7 @@ else:
     LOG_PATH = "/kaggle/working/server.log"
 
 # Configuration variables (set these in code only, not in UI)
-ENABLE_GUARDRAIL = True  # Set to False to disable NSFW content filter
+ENABLE_GUARDRAIL = False  # Set to False to disable NSFW content filter
 ENABLE_IMAGE_UPLOAD = False  # Set to True to enable image upload (image-to-image/video)
 
 def get_working_dir():
