@@ -1,0 +1,159 @@
+/* Luna AI Imagine — modern UI layer (presentation only) */
+
+:root {
+    --luna-purple: #6c4dff;
+    --luna-pink: #ff4fbf;
+    --luna-navy: #2b2145;
+    --luna-surface: #14141c;
+    --luna-surface-2: #1c1c28;
+    --luna-border: rgba(255, 255, 255, 0.08);
+    --luna-glow: rgba(108, 77, 255, 0.35);
+}
+
+/* Hide Gradio footer */
+footer,
+.gradio-container footer,
+.gradio-container > .footer,
+#footer,
+.built-with,
+[class*="built-with"],
+a[href*="gradio.app"] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.gradio-container {
+    max-width: 1280px !important;
+    margin: 0 auto !important;
+    padding: 1.25rem 1rem 2rem !important;
+}
+
+#luna-app,
+#ltx-app {
+    font-family: "Inter", "Segoe UI", system-ui, sans-serif !important;
+}
+
+/* Hero header */
+.luna-hero {
+    text-align: center;
+    padding: 2rem 1.5rem 1.75rem;
+    margin-bottom: 1.25rem;
+    border-radius: 20px;
+    background:
+        radial-gradient(ellipse 80% 60% at 50% -20%, rgba(108, 77, 255, 0.35), transparent),
+        radial-gradient(ellipse 60% 50% at 90% 100%, rgba(255, 79, 191, 0.18), transparent),
+        linear-gradient(145deg, #1a1530 0%, #12121a 55%, #0e0e14 100%);
+    border: 1px solid var(--luna-border);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.luna-hero h1 {
+    margin: 0 0 0.5rem;
+    font-size: clamp(1.75rem, 4vw, 2.35rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, #c4b5fd, #ffffff 40%, #f9a8d4);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.luna-hero p {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 0.98rem;
+    line-height: 1.5;
+}
+
+.luna-badge {
+    display: inline-block;
+    margin-bottom: 0.85rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #e9d5ff;
+    background: rgba(108, 77, 255, 0.2);
+    border: 1px solid rgba(108, 77, 255, 0.35);
+}
+
+/* Panel cards */
+.luna-panel {
+    padding: 1.1rem 1.15rem 1.25rem;
+    border-radius: 16px;
+    background: var(--luna-surface-2);
+    border: 1px solid var(--luna-border);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+.luna-panel-title {
+    margin: 0 0 0.85rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45) !important;
+}
+
+/* Primary generate button */
+#luna-generate-btn,
+#ltx-generate-btn {
+    width: 100% !important;
+    min-height: 3rem !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em;
+    border-radius: 12px !important;
+    border: none !important;
+    box-shadow: 0 8px 24px var(--luna-glow) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+#luna-generate-btn:hover,
+#ltx-generate-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 32px rgba(108, 77, 255, 0.45) !important;
+}
+
+/* Output preview area */
+#luna-result img,
+#ltx-result video {
+    border-radius: 12px;
+}
+
+/* Tabs */
+.tab-nav button {
+    border-radius: 10px 10px 0 0 !important;
+    font-weight: 500 !important;
+}
+
+/* LoRA section */
+.luna-lora-box {
+    padding: 0.85rem 1rem;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px dashed rgba(108, 77, 255, 0.25);
+}
+
+.luna-lora-box .markdown h3 {
+    margin-top: 0 !important;
+    font-size: 0.95rem !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* Compact secondary buttons */
+.luna-secondary-btn {
+    border-radius: 10px !important;
+}
+
+/* Scrollbar for log box */
+textarea {
+    font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace !important;
+    font-size: 0.8rem !important;
+}
