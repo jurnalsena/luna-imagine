@@ -9,22 +9,9 @@ import requests
 import warnings
 import gradio as gr
 
-css = """
-footer {
-    display: none !important;
-}
-
-footer > * {
-    display: none !important;
-}
-"""
-
-with gr.Blocks(css=css) as demo:
-    gr.Markdown("# Luna AI Toolkit")
-
-demo.queue(api_open=False)
+# footer
 demo.launch(show_api=False)
-
+#footer
 
 from requests.exceptions import ReadTimeout
 
