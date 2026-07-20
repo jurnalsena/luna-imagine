@@ -10,7 +10,7 @@ import warnings
 import gradio as gr
 
 # footer
-demo.launch(
+app.launch(
     footer_links=[]
 )
 # footer
