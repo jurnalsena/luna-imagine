@@ -12,6 +12,8 @@ import gradio as gr
 
 from requests.exceptions import ReadTimeout
 
+from prompt_guardrail import enforce_prompt_safety
+
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning, message=".*browser-compatible container.*")
 
@@ -196,8 +198,18 @@ def build_failure_message(status_res):
 
     return "Video generation failed.\n\n" + "\n\n".join(parts)
 
+def _guard_prompt(prompt: str, field_name: str = "Prompt") -> None:
+    """Raises gr.Error when the prompt fails the NSFW guardrail."""
+    try:
+        enforce_prompt_safety(prompt, field_name=field_name)
+    except ValueError as exc:
+        raise gr.Error(str(exc)) from exc
+
 def handle_generation(prompt, negative_prompt, steps, resolution_preset, use_custom_resolution, custom_width, custom_height, duration_seconds, input_image, enable_upscale, cfg_scale, distilled_guidance, scheduler, flow_shift, enable_vae_tiling):
     """Processes frontend inputs and generates video using either CLI (Lightning.ai) or HTTP API (Kaggle)."""
+    _guard_prompt(prompt, "Text prompt")
+    _guard_prompt(negative_prompt, "Negative prompt")
+
     if use_custom_resolution:
         width, height = int(custom_width), int(custom_height)
         if width % 32 != 0 or height % 32 != 0:
@@ -392,7 +404,7 @@ def handle_generation(prompt, negative_prompt, steps, resolution_preset, use_cus
                     working_dir = get_working_dir()
                     os.makedirs(working_dir, exist_ok=True)
                     output_ext = payload["output_format"]
-                    base_video_path = os.path.join(working_dir, f"gen_{job_id}.{output_ext}")
+                    base_video_path = os.path.join(working_dir, f"luna-imagine_{job_id}.{output_ext}")
                     with open(base_video_path, "wb") as f:
                         f.write(video_bytes)
                     return make_preview_video(base_video_path)
@@ -597,6 +609,8 @@ def scan_image_history():
 
 def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selected_loras, lora_strength):
     """Processes image params and posts to the API server."""
+    _guard_prompt(prompt, "Prompt")
+
     # Append LoRA tags to prompt
     final_prompt = prompt
     if selected_loras:
@@ -657,9 +671,9 @@ def build_image_app():
         gr.HTML(
             """
             <div class="luna-hero">
-                <span class="luna-badge">Z-Image Turbo</span>
+                <span class="luna-badge">Cyberus Studio</span>
                 <h1>Luna AI Imagine</h1>
-                <p>High-speed image generation with resolution presets, LoRA support, and live engine monitoring.</p>
+                <p>High-speed image generation with resolution presets.</p>
             </div>
             """
         )
