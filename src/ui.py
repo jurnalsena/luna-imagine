@@ -23,6 +23,9 @@ if os.path.exists("/teamspace/studios/this_studio"):
 else:
     LOG_PATH = "/kaggle/working/server.log"
 
+# Configuration: Set to False to disable content guardrail entirely (only in code, no UI)
+ENABLE_GUARDRAIL = True
+
 def get_working_dir():
     """Returns the environment-specific directory for generated outputs."""
     if os.path.exists("/teamspace/studios/this_studio"):
@@ -72,7 +75,7 @@ def get_vae_tiling_params(enable_tiling):
 def get_live_logs():
     """Reads the tail end of the server log file to stream into the interface."""
     if os.path.exists(LOG_PATH):
-        with open(LOG_PATH, "r") as f:
+        with open(LOG_PATH, "r", encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
             return "".join(lines[-20:])
     return "Waiting for server logs to initialize..."
@@ -287,7 +290,9 @@ except ImportError:
                     ) from None
 
 def _guard_prompt(prompt: str, field_name: str = "Prompt") -> None:
-    """Raises gr.Error when the prompt fails the NSFW guardrail."""
+    """Raises gr.Error when the prompt fails the NSFW guardrail, if enabled."""
+    if not ENABLE_GUARDRAIL:
+        return
     try:
         enforce_prompt_safety(prompt, field_name=field_name)
     except ValueError as exc:
@@ -383,7 +388,7 @@ def handle_generation(prompt, negative_prompt, steps, resolution_preset, use_cus
             env["LD_LIBRARY_PATH"] = ":".join(valid_paths)
             
         # Write real-time output to LOG_PATH
-        log_file = open(LOG_PATH, "w")
+        log_file = open(LOG_PATH, "w", encoding="utf-8", errors="replace")
         try:
             process = subprocess.Popen(
                 cmd,
@@ -398,7 +403,7 @@ def handle_generation(prompt, negative_prompt, steps, resolution_preset, use_cus
             log_file.close()
             
             if process.returncode != 0:
-                with open(LOG_PATH, "r") as f:
+                with open(LOG_PATH, "r", encoding="utf-8", errors="replace") as f:
                     recent_logs = "".join(f.readlines()[-30:])
                 raise gr.Error(f"CLI generation failed with code {process.returncode}.\n\nRecent logs:\n{recent_logs}")
                 
@@ -740,7 +745,7 @@ def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selec
                 image_bytes = base64.b64decode(status_res["result"]["images"][0]["b64_json"])
                 working_dir = get_working_dir()
                 os.makedirs(working_dir, exist_ok=True)
-                base_image_path = os.path.join(working_dir, f"luna-imagine_{job_id}.png")
+                base_image_path = os.path.join(working_dir, f"gen_{job_id}.png")
                 with open(base_image_path, "wb") as f:
                     f.write(image_bytes)
                 return base_image_path
