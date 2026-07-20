@@ -23,10 +23,6 @@ if os.path.exists("/teamspace/studios/this_studio"):
 else:
     LOG_PATH = "/kaggle/working/server.log"
 
-# Configuration variables (set these in code only, not in UI)
-ENABLE_GUARDRAIL = False  # Set to False to disable NSFW content filter
-ENABLE_IMAGE_UPLOAD = False  # Set to True to enable image upload (image-to-image/video)
-
 def get_working_dir():
     """Returns the environment-specific directory for generated outputs."""
     if os.path.exists("/teamspace/studios/this_studio"):
@@ -299,13 +295,8 @@ def _guard_prompt(prompt: str, field_name: str = "Prompt") -> None:
 
 def handle_generation(prompt, negative_prompt, steps, resolution_preset, use_custom_resolution, custom_width, custom_height, duration_seconds, input_image, enable_upscale, cfg_scale, distilled_guidance, scheduler, flow_shift, enable_vae_tiling):
     """Processes frontend inputs and generates video using either CLI (Lightning.ai) or HTTP API (Kaggle)."""
-    if ENABLE_GUARDRAIL:
-        _guard_prompt(prompt, "Text prompt")
-        _guard_prompt(negative_prompt, "Negative prompt")
-    
-    # If image upload is disabled, ignore the input image
-    if not ENABLE_IMAGE_UPLOAD:
-        input_image = None
+    _guard_prompt(prompt, "Text prompt")
+    _guard_prompt(negative_prompt, "Negative prompt")
 
     if use_custom_resolution:
         width, height = int(custom_width), int(custom_height)
@@ -602,21 +593,13 @@ def build_app():
                     enable_vae_tiling = gr.Checkbox(label="Enable VAE Tiling (Disable for A100/A10G to get maximum quality without seams)", value=False if is_lightning_studio() else True)
 
                 enable_upscale = gr.Checkbox(label="Enable Native Hi-Res Upscaling Pass", value=False)
-                input_image = gr.Image(label="Input Image (For Image-to-Video)", type="filepath", visible=ENABLE_IMAGE_UPLOAD)
+                input_image = gr.Image(label="Input Image (For Image-to-Video)", type="filepath")
                 generate_btn = gr.Button("Generate New Video", variant="primary", elem_id="ltx-generate-btn", size="lg")
 
             with gr.Column(scale=1):
                 with gr.Group(elem_classes="luna-panel"):
-                    gr.Markdown("**Preview (Before / After)**", elem_classes="luna-panel-title")
-                    with gr.Row():
-                        before_preview = gr.Image(label="Before (Input Image)", type="filepath", visible=False)
-                        output_video = gr.Video(label="After (Generated Result)", elem_id="ltx-result")
-                
-                # Update before preview when input_image changes
-                def toggle_before_preview(img):
-                    return gr.update(visible=ENABLE_IMAGE_UPLOAD and img is not None, value=img)
-                
-                input_image.change(toggle_before_preview, inputs=[input_image], outputs=[before_preview])
+                    gr.Markdown("**Preview**", elem_classes="luna-panel-title")
+                    output_video = gr.Video(label="Generated Result", elem_id="ltx-result")
                 with gr.Tabs():
                     with gr.Tab("Engine Logs"):
                         log_box = gr.Textbox(label="Live Terminal Output", value="", lines=10, interactive=False, show_label=False)
@@ -625,8 +608,7 @@ def build_app():
 
                     with gr.Tab("History"):
                         refresh_history_btn = gr.Button("Refresh History", variant="secondary", elem_classes="luna-secondary-btn")
-                        history_gallery = gr.Gallery(label="Saved Videos (View History)", columns=3, preview=True)
-                        history_file = gr.File(label="Saved Videos (Download All)", file_count="multiple")
+                        history_gallery = gr.File(label="Saved Videos", file_count="multiple")
 
         generate_btn.click(
             fn=handle_generation,
@@ -636,10 +618,10 @@ def build_app():
                 cfg_scale, distilled_guidance, scheduler, flow_shift, enable_vae_tiling
             ],
             outputs=output_video,
-        ).then(fn=scan_history, outputs=[history_gallery, history_file])
+        ).then(fn=scan_history, outputs=history_gallery)
 
-        refresh_history_btn.click(fn=scan_history, outputs=[history_gallery, history_file])
-        app.load(fn=scan_history, outputs=[history_gallery, history_file])
+        refresh_history_btn.click(fn=scan_history, outputs=history_gallery)
+        app.load(fn=scan_history, outputs=history_gallery)
 
     app.queue()
     return app
@@ -713,10 +695,9 @@ def scan_image_history():
     image_files.sort(key=os.path.getmtime, reverse=True)
     return image_files
 
-def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selected_loras, lora_strength, input_image, denoising_strength=0.75):
+def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selected_loras, lora_strength):
     """Processes image params and posts to the API server."""
-    if ENABLE_GUARDRAIL:
-        _guard_prompt(prompt, "Prompt")
+    _guard_prompt(prompt, "Prompt")
 
     # Append LoRA tags to prompt
     final_prompt = prompt
@@ -725,10 +706,6 @@ def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selec
         for lora in selected_loras:
             lora_name = Path(lora).stem
             final_prompt += f" <lora:{lora_name}:{lora_strength}>"
-
-    # If image upload is disabled, ignore input_image
-    if not ENABLE_IMAGE_UPLOAD:
-        input_image = None
 
     payload = {
         "prompt": str(final_prompt),
@@ -749,14 +726,6 @@ def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selec
         "output_format": "png",
         "output_compression": 100,
     }
-    
-    # Add img2img support if input_image is provided
-    if input_image is not None:
-        payload["strength"] = denoising_strength
-        with open(input_image, "rb") as img_file:
-            img_base64 = base64.b64encode(img_file.read()).decode("utf-8")
-            payload["init_image"] = f"data:image/png;base64,{img_base64}"
-            payload["input_image"] = f"data:image/png;base64,{img_base64}"
 
     try:
         r = requests.post(f"{SERVER_URL}/sdcpp/v1/img_gen", json=payload, timeout=30)
@@ -771,7 +740,7 @@ def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selec
                 image_bytes = base64.b64decode(status_res["result"]["images"][0]["b64_json"])
                 working_dir = get_working_dir()
                 os.makedirs(working_dir, exist_ok=True)
-                base_image_path = os.path.join(working_dir, f"luna-imagine_{job_id}.png")
+                base_image_path = os.path.join(working_dir, f"gen_{job_id}.png")
                 with open(base_image_path, "wb") as f:
                     f.write(image_bytes)
                 return base_image_path
@@ -835,22 +804,12 @@ def build_image_app():
                         return gr.update(choices=get_lora_list())
                     refresh_btn.click(refresh_loras, outputs=[lora_list])
 
-                input_image = gr.Image(label="Input Image (For Image-to-Image)", type="filepath", visible=ENABLE_IMAGE_UPLOAD)
-                denoising_strength = gr.Slider(0.0, 1.0, value=0.75, step=0.05, label="Denoising Strength", visible=ENABLE_IMAGE_UPLOAD)
                 generate_btn = gr.Button("Generate Image", variant="primary", elem_id="luna-generate-btn", size="lg")
 
             with gr.Column(scale=1):
                 with gr.Group(elem_classes="luna-panel"):
-                    gr.Markdown("**Preview (Before / After)**", elem_classes="luna-panel-title")
-                    with gr.Row():
-                        before_preview = gr.Image(label="Before (Input Image)", type="filepath", visible=False)
-                        img = gr.Image(label="After (Generated Result)", show_label=False, interactive=False, type="filepath", elem_id="luna-result")
-                
-                # Update before preview when input_image changes
-                def toggle_before_preview(img_input):
-                    return gr.update(visible=ENABLE_IMAGE_UPLOAD and img_input is not None, value=img_input)
-                
-                input_image.change(toggle_before_preview, inputs=[input_image], outputs=[before_preview])
+                    gr.Markdown("**Result**", elem_classes="luna-panel-title")
+                    img = gr.Image(label="Output", show_label=False, interactive=False, type="filepath", elem_id="luna-result")
 
                 with gr.Tabs():
                     with gr.Tab("Engine Logs"):
@@ -860,19 +819,18 @@ def build_image_app():
 
                     with gr.Tab("History"):
                         refresh_history_btn = gr.Button("Refresh History", variant="secondary", elem_classes="luna-secondary-btn")
-                        history_gallery = gr.Gallery(label="Saved Images (View History", columns=3, preview=True)
-                        history_file = gr.File(label="Saved Images (Download All)", file_count="multiple")
+                        history_gallery = gr.File(label="Saved Images", file_count="multiple")
 
         preset.change(apply_preset, inputs=[preset], outputs=[width, height])
 
         generate_btn.click(
             fn=handle_image_generation,
-            inputs=[prompt, width, height, steps, seed, cfg_scale, lora_list, lora_strength, input_image, denoising_strength],
+            inputs=[prompt, width, height, steps, seed, cfg_scale, lora_list, lora_strength],
             outputs=img,
-        ).then(fn=scan_image_history, outputs=[history_gallery, history_file])
+        ).then(fn=scan_image_history, outputs=history_gallery)
 
-        refresh_history_btn.click(fn=scan_image_history, outputs=[history_gallery, history_file])
-        app.load(fn=scan_image_history, outputs=[history_gallery, history_file])
+        refresh_history_btn.click(fn=scan_image_history, outputs=history_gallery)
+        app.load(fn=scan_image_history, outputs=history_gallery)
 
     app.queue()
     return app
