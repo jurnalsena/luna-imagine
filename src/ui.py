@@ -740,7 +740,7 @@ def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selec
                 image_bytes = base64.b64decode(status_res["result"]["images"][0]["b64_json"])
                 working_dir = get_working_dir()
                 os.makedirs(working_dir, exist_ok=True)
-                base_image_path = os.path.join(working_dir, f"gen_{job_id}.png")
+                base_image_path = os.path.join(working_dir, f"luna-imagine_{job_id}.png")
                 with open(base_image_path, "wb") as f:
                     f.write(image_bytes)
                 return base_image_path
