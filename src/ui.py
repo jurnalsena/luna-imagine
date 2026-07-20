@@ -666,6 +666,6 @@ def build_image_app():
 def launch_image():
     """Convenience function to start Z-Image-Turbo UI immediately in Kaggle."""
     app = build_image_app()
-    app.launch(share=False, inline=False, allowed_paths=[get_working_dir()])
+    app.launch(share=True, inline=True, allowed_paths=[get_working_dir()])
 
 
