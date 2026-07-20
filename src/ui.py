@@ -291,19 +291,19 @@ except ImportError:
                         f"Blocked phrase pattern detected.\n\n{_GUARDRAIL_MESSAGE}"
                     ) from None
 
-def _guard_prompt(prompt: str, field_name: str = "Prompt", enable_guardrail: bool = ENABLE_GUARDRAIL) -> None:
+def _guard_prompt(prompt: str, field_name: str = "Prompt") -> None:
     """Raises gr.Error when the prompt fails the NSFW guardrail, if enabled."""
-    if not ENABLE_GUARDRAIL or not enable_guardrail:
+    if not ENABLE_GUARDRAIL:
         return
     try:
         enforce_prompt_safety(prompt, field_name=field_name)
     except ValueError as exc:
         raise gr.Error(str(exc)) from exc
 
-def handle_generation(prompt, negative_prompt, steps, resolution_preset, use_custom_resolution, custom_width, custom_height, duration_seconds, input_image, enable_upscale, cfg_scale, distilled_guidance, scheduler, flow_shift, enable_vae_tiling, enable_guardrail):
+def handle_generation(prompt, negative_prompt, steps, resolution_preset, use_custom_resolution, custom_width, custom_height, duration_seconds, input_image, enable_upscale, cfg_scale, distilled_guidance, scheduler, flow_shift, enable_vae_tiling):
     """Processes frontend inputs and generates video using either CLI (Lightning.ai) or HTTP API (Kaggle)."""
-    _guard_prompt(prompt, "Text prompt", enable_guardrail)
-    _guard_prompt(negative_prompt, "Negative prompt", enable_guardrail)
+    _guard_prompt(prompt, "Text prompt")
+    _guard_prompt(negative_prompt, "Negative prompt")
 
     if use_custom_resolution:
         width, height = int(custom_width), int(custom_height)
@@ -600,7 +600,6 @@ def build_app():
                     enable_vae_tiling = gr.Checkbox(label="Enable VAE Tiling (Disable for A100/A10G to get maximum quality without seams)", value=False if is_lightning_studio() else True)
 
                 enable_upscale = gr.Checkbox(label="Enable Native Hi-Res Upscaling Pass", value=False)
-                enable_guardrail = gr.Checkbox(label="Enable Content Guardrail (NSFW Filter)", value=True)
                 input_image = gr.Image(label="Input Image (For Image-to-Video)", type="filepath")
                 generate_btn = gr.Button("Generate New Video", variant="primary", elem_id="ltx-generate-btn", size="lg")
 
@@ -623,7 +622,7 @@ def build_app():
             inputs=[
                 prompt, neg_prompt, steps, resolution_preset, use_custom_resolution,
                 custom_width, custom_height, duration_seconds, input_image, enable_upscale,
-                cfg_scale, distilled_guidance, scheduler, flow_shift, enable_vae_tiling, enable_guardrail
+                cfg_scale, distilled_guidance, scheduler, flow_shift, enable_vae_tiling
             ],
             outputs=output_video,
         ).then(fn=scan_history, outputs=history_gallery)
@@ -703,9 +702,9 @@ def scan_image_history():
     image_files.sort(key=os.path.getmtime, reverse=True)
     return image_files
 
-def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selected_loras, lora_strength, enable_guardrail):
+def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selected_loras, lora_strength):
     """Processes image params and posts to the API server."""
-    _guard_prompt(prompt, "Prompt", enable_guardrail)
+    _guard_prompt(prompt, "Prompt")
 
     # Append LoRA tags to prompt
     final_prompt = prompt
@@ -807,7 +806,6 @@ def build_image_app():
                         lora_list = gr.CheckboxGroup(choices=get_lora_list(), label="Select LoRAs")
                         refresh_btn = gr.Button("Refresh", variant="secondary", size="sm", elem_classes="luna-secondary-btn")
                     lora_strength = gr.Slider(0.0, 2.0, value=1.0, step=0.1, label="LoRA Strength")
-                    enable_guardrail = gr.Checkbox(label="Enable Content Guardrail (NSFW Filter)", value=True)
 
                     def refresh_loras():
                         return gr.update(choices=get_lora_list())
@@ -834,7 +832,7 @@ def build_image_app():
 
         generate_btn.click(
             fn=handle_image_generation,
-            inputs=[prompt, width, height, steps, seed, cfg_scale, lora_list, lora_strength, enable_guardrail],
+            inputs=[prompt, width, height, steps, seed, cfg_scale, lora_list, lora_strength],
             outputs=img,
         ).then(fn=scan_image_history, outputs=history_gallery)
 
