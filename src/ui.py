@@ -842,7 +842,7 @@ def build_image_app():
                     refresh_btn.click(refresh_loras, outputs=[lora_list])
 
                 enable_guardrail = gr.Checkbox(label="Enable Content Guardrail (NSFW filter)", value=True)
-                enable_image_upload = gr.Checkbox(label="Enable Image Upload (Image-to-Image)", value=False)
+                enable_image_upload = gr.Checkbox(label="Enable Image Upload (Image-to-Image)", value=True)
                 input_image = gr.Image(label="Input Image (For Image-to-Image)", type="filepath", visible=False)
                 denoising_strength = gr.Slider(0.0, 1.0, value=0.75, step=0.05, label="Denoising Strength", visible=False)
                 generate_btn = gr.Button("Generate Image", variant="primary", elem_id="luna-generate-btn", size="lg")
