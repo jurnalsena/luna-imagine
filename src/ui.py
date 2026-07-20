@@ -23,6 +23,10 @@ if os.path.exists("/teamspace/studios/this_studio"):
 else:
     LOG_PATH = "/kaggle/working/server.log"
 
+# Configuration variables (set these in code only, not in UI)
+ENABLE_GUARDRAIL = True  # Set to False to disable NSFW content filter
+ENABLE_IMAGE_UPLOAD = False  # Set to True to enable image upload (image-to-image/video)
+
 def get_working_dir():
     """Returns the environment-specific directory for generated outputs."""
     if os.path.exists("/teamspace/studios/this_studio"):
@@ -293,14 +297,14 @@ def _guard_prompt(prompt: str, field_name: str = "Prompt") -> None:
     except ValueError as exc:
         raise gr.Error(str(exc)) from exc
 
-def handle_generation(prompt, negative_prompt, steps, resolution_preset, use_custom_resolution, custom_width, custom_height, duration_seconds, input_image, enable_upscale, cfg_scale, distilled_guidance, scheduler, flow_shift, enable_vae_tiling, enable_guardrail, enable_image_upload):
+def handle_generation(prompt, negative_prompt, steps, resolution_preset, use_custom_resolution, custom_width, custom_height, duration_seconds, input_image, enable_upscale, cfg_scale, distilled_guidance, scheduler, flow_shift, enable_vae_tiling):
     """Processes frontend inputs and generates video using either CLI (Lightning.ai) or HTTP API (Kaggle)."""
-    if enable_guardrail:
+    if ENABLE_GUARDRAIL:
         _guard_prompt(prompt, "Text prompt")
         _guard_prompt(negative_prompt, "Negative prompt")
     
     # If image upload is disabled, ignore the input image
-    if not enable_image_upload:
+    if not ENABLE_IMAGE_UPLOAD:
         input_image = None
 
     if use_custom_resolution:
@@ -598,16 +602,8 @@ def build_app():
                     enable_vae_tiling = gr.Checkbox(label="Enable VAE Tiling (Disable for A100/A10G to get maximum quality without seams)", value=False if is_lightning_studio() else True)
 
                 enable_upscale = gr.Checkbox(label="Enable Native Hi-Res Upscaling Pass", value=False)
-                enable_guardrail = gr.Checkbox(label="Enable Content Guardrail (NSFW filter)", value=False)
-                enable_image_upload = gr.Checkbox(label="Enable Image Upload (Image-to-Video)", value=True)
-                input_image = gr.Image(label="Input Image (For Image-to-Video)", type="filepath", visible=False)
+                input_image = gr.Image(label="Input Image (For Image-to-Video)", type="filepath", visible=ENABLE_IMAGE_UPLOAD)
                 generate_btn = gr.Button("Generate New Video", variant="primary", elem_id="ltx-generate-btn", size="lg")
-                
-                # Toggle input_image visibility when enable_image_upload changes
-                def toggle_image_upload(enabled):
-                    return gr.update(visible=enabled)
-                
-                enable_image_upload.change(toggle_image_upload, inputs=[enable_image_upload], outputs=[input_image])
 
             with gr.Column(scale=1):
                 with gr.Group(elem_classes="luna-panel"):
@@ -616,12 +612,11 @@ def build_app():
                         before_preview = gr.Image(label="Before (Input Image)", type="filepath", visible=False)
                         output_video = gr.Video(label="After (Generated Result)", elem_id="ltx-result")
                 
-                # Show/hide before preview when enable_image_upload or input_image changes
-                def toggle_before_preview(enabled, img):
-                    return gr.update(visible=enabled and img is not None, value=img)
+                # Update before preview when input_image changes
+                def toggle_before_preview(img):
+                    return gr.update(visible=ENABLE_IMAGE_UPLOAD and img is not None, value=img)
                 
-                enable_image_upload.change(toggle_before_preview, inputs=[enable_image_upload, input_image], outputs=[before_preview])
-                input_image.change(toggle_before_preview, inputs=[enable_image_upload, input_image], outputs=[before_preview])
+                input_image.change(toggle_before_preview, inputs=[input_image], outputs=[before_preview])
                 with gr.Tabs():
                     with gr.Tab("Engine Logs"):
                         log_box = gr.Textbox(label="Live Terminal Output", value="", lines=10, interactive=False, show_label=False)
@@ -638,8 +633,7 @@ def build_app():
             inputs=[
                 prompt, neg_prompt, steps, resolution_preset, use_custom_resolution,
                 custom_width, custom_height, duration_seconds, input_image, enable_upscale,
-                cfg_scale, distilled_guidance, scheduler, flow_shift, enable_vae_tiling,
-                enable_guardrail, enable_image_upload
+                cfg_scale, distilled_guidance, scheduler, flow_shift, enable_vae_tiling
             ],
             outputs=output_video,
         ).then(fn=scan_history, outputs=[history_gallery, history_file])
@@ -719,9 +713,9 @@ def scan_image_history():
     image_files.sort(key=os.path.getmtime, reverse=True)
     return image_files
 
-def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selected_loras, lora_strength, enable_guardrail, input_image, enable_image_upload, denoising_strength=0.75):
+def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selected_loras, lora_strength, input_image, denoising_strength=0.75):
     """Processes image params and posts to the API server."""
-    if enable_guardrail:
+    if ENABLE_GUARDRAIL:
         _guard_prompt(prompt, "Prompt")
 
     # Append LoRA tags to prompt
@@ -733,7 +727,7 @@ def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selec
             final_prompt += f" <lora:{lora_name}:{lora_strength}>"
 
     # If image upload is disabled, ignore input_image
-    if not enable_image_upload:
+    if not ENABLE_IMAGE_UPLOAD:
         input_image = None
 
     payload = {
@@ -777,7 +771,7 @@ def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selec
                 image_bytes = base64.b64decode(status_res["result"]["images"][0]["b64_json"])
                 working_dir = get_working_dir()
                 os.makedirs(working_dir, exist_ok=True)
-                base_image_path = os.path.join(working_dir, f"gen_{job_id}.png")
+                base_image_path = os.path.join(working_dir, f"luna-imagine_{job_id}.png")
                 with open(base_image_path, "wb") as f:
                     f.write(image_bytes)
                 return base_image_path
@@ -841,17 +835,9 @@ def build_image_app():
                         return gr.update(choices=get_lora_list())
                     refresh_btn.click(refresh_loras, outputs=[lora_list])
 
-                enable_guardrail = gr.Checkbox(label="Enable Content Guardrail (NSFW filter)", value=True)
-                enable_image_upload = gr.Checkbox(label="Enable Image Upload (Image-to-Image)", value=True)
-                input_image = gr.Image(label="Input Image (For Image-to-Image)", type="filepath", visible=False)
-                denoising_strength = gr.Slider(0.0, 1.0, value=0.75, step=0.05, label="Denoising Strength", visible=False)
+                input_image = gr.Image(label="Input Image (For Image-to-Image)", type="filepath", visible=ENABLE_IMAGE_UPLOAD)
+                denoising_strength = gr.Slider(0.0, 1.0, value=0.75, step=0.05, label="Denoising Strength", visible=ENABLE_IMAGE_UPLOAD)
                 generate_btn = gr.Button("Generate Image", variant="primary", elem_id="luna-generate-btn", size="lg")
-                
-                # Toggle input_image and denoising_strength visibility when enable_image_upload changes
-                def toggle_image_upload(enabled):
-                    return (gr.update(visible=enabled), gr.update(visible=enabled))
-                
-                enable_image_upload.change(toggle_image_upload, inputs=[enable_image_upload], outputs=[input_image, denoising_strength])
 
             with gr.Column(scale=1):
                 with gr.Group(elem_classes="luna-panel"):
@@ -860,12 +846,11 @@ def build_image_app():
                         before_preview = gr.Image(label="Before (Input Image)", type="filepath", visible=False)
                         img = gr.Image(label="After (Generated Result)", show_label=False, interactive=False, type="filepath", elem_id="luna-result")
                 
-                # Show/hide before preview when enable_image_upload or input_image changes
-                def toggle_before_preview(enabled, img_input):
-                    return gr.update(visible=enabled and img_input is not None, value=img_input)
+                # Update before preview when input_image changes
+                def toggle_before_preview(img_input):
+                    return gr.update(visible=ENABLE_IMAGE_UPLOAD and img_input is not None, value=img_input)
                 
-                enable_image_upload.change(toggle_before_preview, inputs=[enable_image_upload, input_image], outputs=[before_preview])
-                input_image.change(toggle_before_preview, inputs=[enable_image_upload, input_image], outputs=[before_preview])
+                input_image.change(toggle_before_preview, inputs=[input_image], outputs=[before_preview])
 
                 with gr.Tabs():
                     with gr.Tab("Engine Logs"):
@@ -882,7 +867,7 @@ def build_image_app():
 
         generate_btn.click(
             fn=handle_image_generation,
-            inputs=[prompt, width, height, steps, seed, cfg_scale, lora_list, lora_strength, enable_guardrail, input_image, enable_image_upload, denoising_strength],
+            inputs=[prompt, width, height, steps, seed, cfg_scale, lora_list, lora_strength, input_image, denoising_strength],
             outputs=img,
         ).then(fn=scan_image_history, outputs=[history_gallery, history_file])
 
