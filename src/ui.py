@@ -8,6 +8,24 @@ import subprocess
 import requests
 import warnings
 import gradio as gr
+
+css = """
+footer {
+    display: none !important;
+}
+
+footer > * {
+    display: none !important;
+}
+"""
+
+with gr.Blocks(css=css) as demo:
+    gr.Markdown("# Luna AI Toolkit")
+
+demo.queue(api_open=False)
+demo.launch(show_api=False)
+
+
 from requests.exceptions import ReadTimeout
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
