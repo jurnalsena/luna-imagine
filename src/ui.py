@@ -82,9 +82,9 @@ def scan_history():
     """Scans the working directory for generated video outputs."""
     working_dir = get_working_dir()
     video_files = (
-        glob.glob(os.path.join(working_dir, "gen_*.webm"))
-        + glob.glob(os.path.join(working_dir, "gen_*.avi"))
-        + glob.glob(os.path.join(working_dir, "gen_*.mp4"))
+        glob.glob(os.path.join(working_dir, "luna_*.webm"))
+        + glob.glob(os.path.join(working_dir, "luna_*.avi"))
+        + glob.glob(os.path.join(working_dir, "luna_*.mp4"))
     )
     video_files.sort(key=os.path.getmtime, reverse=True)
     return video_files
@@ -230,7 +230,7 @@ def handle_generation(prompt, negative_prompt, steps, resolution_preset, use_cus
         
         job_id = str(int(time.time()))
         output_ext = "webm"
-        base_video_path = os.path.join(working_dir, f"gen_{job_id}.{output_ext}")
+        base_video_path = os.path.join(working_dir, f"luna-imagine_{job_id}.{output_ext}")
         
         # Build command-line list
         cmd = [
