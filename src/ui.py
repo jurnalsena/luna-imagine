@@ -10,19 +10,6 @@ import warnings
 import gradio as gr
 from requests.exceptions import ReadTimeout
 
-gr.Blocks(css=css)
-
-def greet(name):
-    return "Luna AI Imagine " + name + "!"
-
-demo = gr.Interface(
-    fn=greet,
-    inputs="text",
-    outputs="text",
-    css="footer {visibility: hidden}"
-)
-demo.launch()
-
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning, message=".*browser-compatible container.*")
 
@@ -680,3 +667,21 @@ def launch_image():
     """Convenience function to start Z-Image-Turbo UI immediately in Kaggle."""
     app = build_image_app()
     app.launch(share=True, inline=False, allowed_paths=[get_working_dir()])
+
+title = "Report" 
+items = ["alpha", "beta", "gamma"] 
+ 
+html = f"""<!doctype html> 
+<html> 
+<head><meta charset="utf-8"><title>{title}</title>
+	<style>
+		.footer {visibility: none}
+	</style>
+</head> 
+<body> 
+  <h1>{title}</h1> 
+  <ul> 
+    {"".join(f"<li>{item}</li>" for item in items)} 
+  </ul> 
+</body> 
+</html>""" 
