@@ -9,6 +9,7 @@ import requests
 import warnings
 import gradio as gr
 
+
 from requests.exceptions import ReadTimeout
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -667,6 +668,6 @@ def build_image_app():
 def launch_image():
     """Convenience function to start Z-Image-Turbo UI immediately in Kaggle."""
     app = build_image_app()
-    app.launch(share=True, inline=False, allowed_paths=[get_working_dir()], footer_links=[])
+    app.launch(share=True, inline=False, allowed_paths=[get_working_dir()])
 
 
