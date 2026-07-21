@@ -698,7 +698,10 @@ def apply_preset(preset_label):
 def scan_image_history():
     """Scans the working directory for generated image outputs."""
     working_dir = get_working_dir()
-    image_files = glob.glob(os.path.join(working_dir, "luna-imagine_*.png"))
+    image_files = (
+        glob.glob(os.path.join(working_dir, "luna-imagine_*.png")) +
+        glob.glob(os.path.join(working_dir, "luna-imagine-edit_*.png"))
+    )
     image_files.sort(key=os.path.getmtime, reverse=True)
     return image_files
 
@@ -757,6 +760,76 @@ def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selec
 
             time.sleep(1.5) # Fast polling for image
 
+
+def handle_image_edit(prompt, input_image, steps, seed, cfg_scale, denoising_strength, selected_loras, lora_strength):
+    """Processes image edit (img2img) params and posts to the API server."""
+    _guard_prompt(prompt, "Prompt")
+
+    # Append LoRA tags to prompt
+    final_prompt = prompt
+    if selected_loras:
+        from pathlib import Path
+        for lora in selected_loras:
+            lora_name = Path(lora).stem
+            final_prompt += f" <lora:{lora_name}:{lora_strength}>"
+
+    # Get input image dimensions (we'll use original image size)
+    from PIL import Image
+    import io
+    with Image.open(input_image) as img:
+        width, height = img.size
+
+    payload = {
+        "prompt": str(final_prompt),
+        "negative_prompt": "",
+        "width": int(width),
+        "height": int(height),
+        "strength": float(denoising_strength),
+        "seed": int(seed) if int(seed) > 0 else -1,
+        "sample_params": {
+            "scheduler": "discrete",
+            "sample_method": "euler",
+            "sample_steps": int(steps),
+            "guidance": {
+                "txt_cfg": float(cfg_scale),
+                "img_cfg": float(cfg_scale),
+                "distilled_guidance": float(cfg_scale)
+            }
+        },
+        "output_format": "png",
+        "output_compression": 100,
+    }
+
+    # Add init_image to payload
+    with open(input_image, "rb") as img_file:
+        img_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+    image_payload = f"data:image/png;base64,{img_base64}"
+    payload["init_image"] = image_payload
+    payload["input_image"] = image_payload
+
+    try:
+        r = requests.post(f"{SERVER_URL}/sdcpp/v1/img_gen", json=payload, timeout=30)
+        r.raise_for_status()
+        job_id = r.json()["id"]
+
+        while True:
+            status_res = requests.get(f"{SERVER_URL}/sdcpp/v1/jobs/{job_id}", timeout=10).json()
+            status = status_res.get("status", "unknown")
+
+            if status == "completed":
+                image_bytes = base64.b64decode(status_res["result"]["images"][0]["b64_json"])
+                working_dir = get_working_dir()
+                os.makedirs(working_dir, exist_ok=True)
+                base_image_path = os.path.join(working_dir, f"luna-imagine-edit_{job_id}.png")
+                with open(base_image_path, "wb") as f:
+                    f.write(image_bytes)
+                return base_image_path
+
+            if status in ("failed", "cancelled"):
+                raise gr.Error(build_failure_message(status_res))
+
+            time.sleep(1.5) # Fast polling for image
+
     except Exception as e:
         raise gr.Error(f"Could not communicate with the generation server.\n\n{type(e).__name__}: {e}\n\nRecent logs:\n{get_live_logs()}")
 
@@ -775,43 +848,85 @@ def build_image_app():
 
         with gr.Row(equal_height=False):
             with gr.Column(scale=1):
-                with gr.Group(elem_classes="luna-panel"):
-                    gr.Markdown("**Prompt**", elem_classes="luna-panel-title")
-                    prompt = gr.Textbox(
-                        label="Describe your image",
-                        show_label=False,
-                        value="Create a premium, modern, minimalist vector logo for a tool engine called: Luna AI Imagine, featuring a cute chibi anime mascot inspired by a young businesswoman with short magenta/pink bob hair, large bright blue eyes, fair skin, wearing a black business blazer, white shirt, black skirt, and black shoes, smiling cheerfully with one eye winking while pointing upward with one hand and resting the other on her waist. Place the mascot inside a modern circular emblem with a purple-to-pink gradient ring inspired by a crescent moon, with a simplified visual novel UI window behind her showing a dialogue box, landscape background, and minimal interface controls in a clean flat vector style. Add subtle sparkles, stars, and a crescent moon icon to reinforce the Luna identity. Use bold rounded geometric sans-serif typography with the text: Luna and a large stylized text: AI, with the subtitle: - IMAGINE - below. Use a premium color palette of purple (#6C4DFF), pink (#FF4FBF), dark navy (#2B2145), and white accents with soft neon gradients. The logo should feel like a premium startup brand, inspired by Japanese anime, with a clean flat vector illustration style, modern UI aesthetic, cute yet professional appearance, symmetrical composition, high contrast, suitable for software branding, website, launcher, GitHub, and application icon, ultra-clean SVG-style vector quality, transparent background, 1:1 aspect ratio, no watermark, no mockup, no realistic rendering, no photorealism, no 3D, no blur, no pixelation, no extra characters, no distorted anatomy, no clutter, no complex background, and no unnecessary decorative elements. 8k",
-                        lines=4,
-                        placeholder="Describe the image you want to create...",
-                    )
+                with gr.Tabs():
+                    # Generate Tab
+                    with gr.Tab("Generate"):
+                        with gr.Group(elem_classes="luna-panel"):
+                            gr.Markdown("**Prompt**", elem_classes="luna-panel-title")
+                            prompt_gen = gr.Textbox(
+                                label="Describe your image",
+                                show_label=False,
+                                value="Create a premium, modern, minimalist vector logo for a tool engine called: Luna AI Imagine, featuring a cute chibi anime mascot inspired by a young businesswoman with short magenta/pink bob hair, large bright blue eyes, fair skin, wearing a black business blazer, white shirt, black skirt, and black shoes, smiling cheerfully with one eye winking while pointing upward with one hand and resting the other on her waist. Place the mascot inside a modern circular emblem with a purple-to-pink gradient ring inspired by a crescent moon, with a simplified visual novel UI window behind her showing a dialogue box, landscape background, and minimal interface controls in a clean flat vector style. Add subtle sparkles, stars, and a crescent moon icon to reinforce the Luna identity. Use bold rounded geometric sans-serif typography with the text: Luna and a large stylized text: AI, with the subtitle: - IMAGINE - below. Use a premium color palette of purple (#6C4DFF), pink (#FF4FBF), dark navy (#2B2145), and white accents with soft neon gradients. The logo should feel like a premium startup brand, inspired by Japanese anime, with a clean flat vector illustration style, modern UI aesthetic, cute yet professional appearance, symmetrical composition, high contrast, suitable for software branding, website, launcher, GitHub, and application icon, ultra-clean SVG-style vector quality, transparent background, 1:1 aspect ratio, no watermark, no mockup, no realistic rendering, no photorealism, no 3D, no blur, no pixelation, no extra characters, no distorted anatomy, no clutter, no complex background, and no unnecessary decorative elements. 8k",
+                                lines=4,
+                                placeholder="Describe the image you want to create...",
+                            )
 
-                with gr.Group(elem_classes="luna-panel"):
-                    gr.Markdown("**Settings**", elem_classes="luna-panel-title")
-                    with gr.Row():
-                        preset = gr.Dropdown([n for n, _, _ in RES_PRESETS], value="1:1 (512x512)", label="Resolution Preset")
-                        steps = gr.Slider(1, 50, value=8, step=1, label="Steps")
+                        with gr.Group(elem_classes="luna-panel"):
+                            gr.Markdown("**Settings**", elem_classes="luna-panel-title")
+                            with gr.Row():
+                                preset = gr.Dropdown([n for n, _, _ in RES_PRESETS], value="1:1 (512x512)", label="Resolution Preset")
+                                steps_gen = gr.Slider(1, 50, value=8, step=1, label="Steps")
 
-                    with gr.Row():
-                        width = gr.Dropdown(SIZE_OPTIONS, value=512, label="Width")
-                        height = gr.Dropdown(SIZE_OPTIONS, value=512, label="Height")
+                            with gr.Row():
+                                width = gr.Dropdown(SIZE_OPTIONS, value=512, label="Width")
+                                height = gr.Dropdown(SIZE_OPTIONS, value=512, label="Height")
 
-                    with gr.Row():
-                        cfg_scale = gr.Slider(0.0, 10.0, value=1.0, step=0.1, label="CFG Scale")
-                        seed = gr.Number(value=0, label="Seed (0 = random)")
+                            with gr.Row():
+                                cfg_scale_gen = gr.Slider(0.0, 10.0, value=1.0, step=0.1, label="CFG Scale")
+                                seed_gen = gr.Number(value=0, label="Seed (0 = random)")
 
-                with gr.Group(elem_classes=["luna-panel", "luna-lora-box"]):
-                    gr.Markdown("### LoRA Support")
-                    gr.Markdown("*Place `.safetensors` files in `/tmp/models/loras/`*")
-                    with gr.Row():
-                        lora_list = gr.CheckboxGroup(choices=get_lora_list(), label="Select LoRAs")
-                        refresh_btn = gr.Button("Refresh", variant="secondary", size="sm", elem_classes="luna-secondary-btn")
-                    lora_strength = gr.Slider(0.0, 2.0, value=1.0, step=0.1, label="LoRA Strength")
+                        with gr.Group(elem_classes=["luna-panel", "luna-lora-box"]):
+                            gr.Markdown("### LoRA Support")
+                            gr.Markdown("*Place `.safetensors` files in `/tmp/models/loras/`*")
+                            with gr.Row():
+                                lora_list_gen = gr.CheckboxGroup(choices=get_lora_list(), label="Select LoRAs")
+                                refresh_btn_gen = gr.Button("Refresh", variant="secondary", size="sm", elem_classes="luna-secondary-btn")
+                            lora_strength_gen = gr.Slider(0.0, 2.0, value=1.0, step=0.1, label="LoRA Strength")
 
-                    def refresh_loras():
-                        return gr.update(choices=get_lora_list())
-                    refresh_btn.click(refresh_loras, outputs=[lora_list])
+                            def refresh_loras_gen():
+                                return gr.update(choices=get_lora_list())
+                            refresh_btn_gen.click(refresh_loras_gen, outputs=[lora_list_gen])
 
-                generate_btn = gr.Button("Generate Image", variant="primary", elem_id="luna-generate-btn", size="lg")
+                        generate_btn = gr.Button("Generate Image", variant="primary", elem_id="luna-generate-btn", size="lg")
+
+                    # Edit Tab
+                    with gr.Tab("Edit"):
+                        with gr.Group(elem_classes="luna-panel"):
+                            gr.Markdown("**Upload Image**", elem_classes="luna-panel-title")
+                            input_image_edit = gr.Image(label="Input Image", type="filepath")
+                        
+                        with gr.Group(elem_classes="luna-panel"):
+                            gr.Markdown("**Prompt**", elem_classes="luna-panel-title")
+                            prompt_edit = gr.Textbox(
+                                label="Describe how you want to edit the image",
+                                show_label=False,
+                                lines=4,
+                                placeholder="Describe how you want to edit the image...",
+                            )
+
+                        with gr.Group(elem_classes="luna-panel"):
+                            gr.Markdown("**Settings**", elem_classes="luna-panel-title")
+                            with gr.Row():
+                                steps_edit = gr.Slider(1, 50, value=8, step=1, label="Steps")
+                                denoising_strength = gr.Slider(0.0, 1.0, value=0.75, step=0.01, label="Denoising Strength (how much to change the image)")
+
+                            with gr.Row():
+                                cfg_scale_edit = gr.Slider(0.0, 10.0, value=1.0, step=0.1, label="CFG Scale")
+                                seed_edit = gr.Number(value=0, label="Seed (0 = random)")
+
+                        with gr.Group(elem_classes=["luna-panel", "luna-lora-box"]):
+                            gr.Markdown("### LoRA Support")
+                            gr.Markdown("*Place `.safetensors` files in `/tmp/models/loras/`*")
+                            with gr.Row():
+                                lora_list_edit = gr.CheckboxGroup(choices=get_lora_list(), label="Select LoRAs")
+                                refresh_btn_edit = gr.Button("Refresh", variant="secondary", size="sm", elem_classes="luna-secondary-btn")
+                            lora_strength_edit = gr.Slider(0.0, 2.0, value=1.0, step=0.1, label="LoRA Strength")
+
+                            def refresh_loras_edit():
+                                return gr.update(choices=get_lora_list())
+                            refresh_btn_edit.click(refresh_loras_edit, outputs=[lora_list_edit])
+
+                        edit_btn = gr.Button("Edit Image", variant="primary", elem_id="luna-edit-btn", size="lg")
 
             with gr.Column(scale=1):
                 with gr.Group(elem_classes="luna-panel"):
@@ -832,7 +947,13 @@ def build_image_app():
 
         generate_btn.click(
             fn=handle_image_generation,
-            inputs=[prompt, width, height, steps, seed, cfg_scale, lora_list, lora_strength],
+            inputs=[prompt_gen, width, height, steps_gen, seed_gen, cfg_scale_gen, lora_list_gen, lora_strength_gen],
+            outputs=img,
+        ).then(fn=scan_image_history, outputs=history_gallery)
+        
+        edit_btn.click(
+            fn=handle_image_edit,
+            inputs=[prompt_edit, input_image_edit, steps_edit, seed_edit, cfg_scale_edit, denoising_strength, lora_list_edit, lora_strength_edit],
             outputs=img,
         ).then(fn=scan_image_history, outputs=history_gallery)
 
