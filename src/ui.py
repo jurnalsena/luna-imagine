@@ -760,6 +760,9 @@ def handle_image_generation(prompt, width, height, steps, seed, cfg_scale, selec
 
             time.sleep(1.5) # Fast polling for image
 
+    except Exception as e:
+        raise gr.Error(f"Could not communicate with the generation server.\n\n{type(e).__name__}: {e}\n\nRecent logs:\n{get_live_logs()}")
+
 
 def handle_image_edit(prompt, input_image, steps, seed, cfg_scale, denoising_strength, selected_loras, lora_strength):
     """Processes image edit (img2img) params and posts to the API server."""
