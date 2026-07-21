@@ -24,7 +24,7 @@ else:
     LOG_PATH = "/kaggle/working/server.log"
 
 # Configuration: Set to False to disable content guardrail entirely (only in code, no UI)
-ENABLE_GUARDRAIL = False
+ENABLE_GUARDRAIL = True
 
 def get_working_dir():
     """Returns the environment-specific directory for generated outputs."""
