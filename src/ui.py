@@ -556,12 +556,12 @@ def build_app():
     default_duration = 2 if is_lightning_studio() else 5
     default_steps = 6 if is_lightning_studio() else 8
 
-    with gr.Blocks(theme=_modern_theme(), css=_load_ui_css(), elem_id="ltx-app", title="LTX Video Studio") as app:
+    with gr.Blocks(theme=_modern_theme(), css=_load_ui_css(), elem_id="ltx-app", title="Luna AI LTX Video Studio") as app:
         gr.HTML(
             """
             <div class="luna-hero">
                 <span class="luna-badge">LTX 2.3</span>
-                <h1>LTX Video Studio</h1>
+                <h1>Luna AI LTX Video Studio</h1>
                 <p>Generate videos with fine-tuned controls. Monitor engine logs and browse your generation history.</p>
             </div>
             """
@@ -579,6 +579,7 @@ def build_app():
                         "360p (480x360) - Fastest Testing Baseline",
                         "480p (640x368) - Optimized Safe Balanced Size",
                         "720p (832x480) - High Resolution Cinematic Layout",
+                        "720p (720x1280) - High Resolution Vertival Layout",
                     ],
                     value=default_resolution,
                     label="Core Video Generation Dimensions",
